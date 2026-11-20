@@ -1388,6 +1388,35 @@ class KnownValues(unittest.TestCase):
         assert abs(grad_ref - grad).max().get() < 1e-12
         assert abs(sigma_ref - sigma).max().get() < 1e-12
 
+    def test_energy_derivatives_nonhermitian_dm(self):
+        # Only the Hermitian part of dm contributes to the energy derivatives
+        np.random.seed(7)
+        nao = cell_orth.nao
+        ni = multigrid.MultiGridNumInt(cell_orth)
+        dm0 = np.random.rand(nao, nao) * .2 + np.eye(nao)
+        ref = ni.energy_derivatives('lda,', (dm0 + dm0.T) * .5,
+                                    with_j=True, with_nuc=True)
+        out = ni.energy_derivatives('lda,', dm0, with_j=True, with_nuc=True,
+                                    hermi=0)
+        assert abs(out - ref).max() < 1e-10
+
+    def test_energy_derivatives_nonhermitian_dm_kpts(self):
+        # MP mesh (0, 1/3, 2/3). The k=0 block is real and k=2/3 = -1/3 holds
+        # the conjugate of the k=1/3 block, so that the supercell dm is real.
+        np.random.seed(8)
+        nao = cell_orth.nao
+        kmesh_kpts = cell_orth.make_kpts([3,1,1])
+        ni = multigrid.MultiGridNumInt(cell_orth)
+        dm_k = np.random.rand(nao, nao) * .2 + np.random.rand(nao, nao) * .1j
+        dm_gamma = np.random.rand(nao, nao) * .2
+        dm0 = np.array([dm_gamma, dm_k, dm_k.conj()]) + np.eye(nao)
+        dm_herm = (dm0 + dm0.conj().transpose(0,2,1)) * .5
+        ref = ni.energy_derivatives('lda,', dm_herm, kmesh_kpts,
+                                    with_j=True, with_nuc=True)
+        out = ni.energy_derivatives('lda,', dm0, kmesh_kpts,
+                                    with_j=True, with_nuc=True, hermi=0)
+        assert abs(out - ref).max() < 1e-10
+
 class AdditionalModes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

@@ -354,7 +354,7 @@ def _eval_rhoG(ni, dm_kpts, hermi=1, kpts=None, xctype='LDA'):
     assert xctype == 'LDA'
     assert not ni.allow_mesh_reduction
     kpts, _ = _normalize_kpts(kpts)
-    dm_sc = _wannier_transform_dm(ni, dm_kpts, kpts, hermi=1)
+    dm_sc = _wannier_transform_dm(ni, dm_kpts, kpts, hermi)
     n_dm, nkpts, nao = dm_sc.shape[:3]
     rhoG = cp.array([_eval_density(ni, dm_sc[i])[0] for i in range(n_dm)])
     return rhoG
@@ -2372,7 +2372,7 @@ class MultiGridNumInt(multigrid_v1.MultiGridNumIntBase):
     cache_xc_kernel = NotImplemented
 
     def energy_nuclear_gradient(self, xc_code, dm_kpts, kpts=None, spin=None,
-                                with_j=False, with_nuc=False):
+                                with_j=False, with_nuc=False, hermi=1):
         '''Computes the nuclear gradients of Exc along with additional
         contributions from the Coulomb and pseudopotential terms.
 
@@ -2382,12 +2382,15 @@ class MultiGridNumInt(multigrid_v1.MultiGridNumIntBase):
             with_nuc :
                 Whether to include the contribution from the local part of
                 pseudo-potential or electron-nuclear Coulomb interactions
+            hermi :
+                1 if dm_kpts is Hermitian. Otherwise, only the Hermitian part
+                of dm_kpts contributes.
         '''
         return self.energy_derivatives(xc_code, dm_kpts, kpts, spin, with_j,
-                                       with_nuc)[:-3]
+                                       with_nuc, hermi)[:-3]
 
     def energy_strain_gradient(self, xc_code, dm_kpts, kpts=None, spin=None,
-                               with_j=False, with_nuc=False):
+                               with_j=False, with_nuc=False, hermi=1):
         '''Computes the strain derivatives of Exc along with additional
         contributions from the Coulomb and pseudopotential terms.
 
@@ -2397,12 +2400,15 @@ class MultiGridNumInt(multigrid_v1.MultiGridNumIntBase):
             with_nuc :
                 Whether to include the contribution from the local part of
                 pseudo-potential or electron-nuclear Coulomb interactions
+            hermi :
+                1 if dm_kpts is Hermitian. Otherwise, only the Hermitian part
+                of dm_kpts contributes.
         '''
         return self.energy_derivatives(xc_code, dm_kpts, kpts, spin, with_j,
-                                       with_nuc)[-3:]
+                                       with_nuc, hermi)[-3:]
 
     def energy_derivatives(self, xc_code, dm_kpts, kpts=None, spin=None,
-                           with_j=False, with_nuc=False):
+                           with_j=False, with_nuc=False, hermi=1):
         '''Computes the nuclear gradients and strain derivatives of Exc
         along with additional contributions from the Coulomb and pseudopotential
         terms.
@@ -2413,6 +2419,9 @@ class MultiGridNumInt(multigrid_v1.MultiGridNumIntBase):
             with_nuc :
                 Whether to include the contribution from the local part of
                 pseudo-potential or electron-nuclear Coulomb interactions
+            hermi :
+                1 if dm_kpts is Hermitian. Otherwise, only the Hermitian part
+                of dm_kpts contributes.
         '''
         kpts, _ = _normalize_kpts(kpts)
         cell = self.cell
@@ -2422,7 +2431,7 @@ class MultiGridNumInt(multigrid_v1.MultiGridNumIntBase):
         xctype = self._xc_type(xc_code)
         nvar = _xc_var_length(xctype)
 
-        dm_sc = _wannier_transform_dm(self, dm_kpts, kpts, 1, xctype)
+        dm_sc = _wannier_transform_dm(self, dm_kpts, kpts, hermi, xctype)
         n_dm = len(dm_sc)
 
         mesh = self.mesh
